@@ -10,7 +10,6 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Resource } from "sst";
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 
-
 const s3Client = new S3Client({});
 const sesClient = new SESv2Client();
 const MAX_FILE_SIZE = 40 * 1024 * 1024;
@@ -18,162 +17,172 @@ const MAX_FILE_SIZE = 40 * 1024 * 1024;
 interface ProxyRequest {
 	url: string;
 	title: string;
-    email: string
+	email: string;
 }
 
 export async function handler(req) {
-// console.log('req:', req)
-const {url, title, email} = JSON.parse(req.Records[0].body)
-console.log('url, title, email:', url, title, email)
+	// console.log('req:', req)
+	const { url, title, email } = JSON.parse(req.Records[0].body);
+	const fileName = title.replace(/[^a-zA-Z0-9.-]/g, "_"); // Sanitize filename
 
-try {
-    // Download the file
-    const response = await fetch(url);
-    if (!response.ok) {
-      return { 
-        error: `Failed to download file: ${response.status} ${response.statusText}` 
-      }
-    }
+	try {
+		const getCommand = new GetObjectCommand({
+			Bucket: Resource.YTDLBucket.name,
+			Key: fileName,
+		});
+		const existingFile = await s3Client.send(getCommand);
 
-    const fileBuffer = await response.arrayBuffer();
-    if (fileBuffer.byteLength > MAX_FILE_SIZE) {
-      return { 
-        error: 'File size exceeds maximum allowed size of 40MB' 
-      }
-    }
+		if (existingFile) {
+			// File exists, get the content and send email
+			const fileBuffer = await existingFile.Body?.transformToByteArray();
+			if (fileBuffer) {
+				const base64File = Buffer.from(fileBuffer).toString("base64");
 
-    // Convert to Base64
-    const base64File = Buffer.from(fileBuffer).toString('base64');
-    const fileName = title.replace(/[^a-zA-Z0-9.-]/g, '_'); // Sanitize filename
+				await sendEmailWithAttachment({
+					to: email,
+					title,
+					url,
+					attachment: {
+						fileName: title,
+						contentType: existingFile.ContentType || "application/octet-stream",
+						base64Content: base64File,
+					},
+				});
 
-    // Send email with attachment
-    const emailCommand = new SendEmailCommand({
-      FromEmailAddress: "guideg6@gmail.com", // Replace with your verified SES sender
-      Destination: {
-        ToAddresses: [email],
-      },
-      Content: {
-        Simple: {
-          Subject: {
-            Data: `Your file: ${title}`,
-          },
-          Body: {
-            Html: {
-              Data: `
-                <h2>Your file is attached</h2>
-                <p>File: ${title}</p>
-                <p>Original URL: ${url}</p>
-              `,
-            },
-            Text: {
-              Data: `
-                Your file is attached
-                File: ${title}
-                Original URL: ${url}
-              `,
-            },
-          },
-        },
-        // Raw: {
-        //   Data: Buffer.from(
-        //     [
-        //       'MIME-Version: 1.0',
-        //       'Content-Type: multipart/mixed; boundary="boundary"',
-        //       '',
-        //       '--boundary',
-        //       'Content-Type: text/html; charset=utf-8',
-        //       '',
-        //       `<h2>Your file is attached</h2>
-        //        <p>File: ${title}</p>
-        //        <p>Original URL: ${url}</p>`,
-        //       '',
-        //       '--boundary',
-        //       `Content-Type: ${response.headers.get('content-type') || 'application/octet-stream'}`,
-        //       'Content-Transfer-Encoding: base64',
-        //       `Content-Disposition: attachment; filename="${fileName}"`,
-        //       '',
-        //       base64File,
-        //       '',
-        //       '--boundary--',
-        //     ].join('\r\n')
-        //   )
-        // }
-      },
-    });
+				return {
+					success: true,
+					message: `Existing file sent to ${email}`,
+					metadata: {
+						s3Key: fileName,
+						title,
+						originalUrl: url,
+						contentType: existingFile.ContentType,
+						contentLength: fileBuffer.length,
+					},
+				};
+			}
+		}
+	} catch (error) {
+		if (error.Code !== "NoSuchKey") {
+			console.error("S3 check error:", error);
+			throw error;
+		}
+        console.log("fetchng")
+  
+		const response = await fetch(url);
+		if (!response.ok) {
+			return {
+				error: `Failed to download file: ${response.status} ${response.statusText}`,
+			};
+		}
 
-    await sesClient.send(emailCommand);
+		const fileBuffer = await response.arrayBuffer();
+		if (fileBuffer.byteLength > MAX_FILE_SIZE) {
+			return {
+				error: "File size exceeds maximum allowed size of 40MB",
+			};
+		}
 
-    // Optional: Still save to S3 as backup
-    const s3Key = `${Date.now()}-${crypto.randomUUID()}`;
-    const uploadCommand = new PutObjectCommand({
-      Bucket: Resource.YTDLBucket.name,
-      Key: s3Key,
-      Body: Buffer.from(fileBuffer),
-      ContentType: response.headers.get('content-type') || 'application/octet-stream',
-      Metadata: {
-        title,
-        originalUrl: url,
-        sentTo: email,
-      },
-    });
+		// Convert to Base64
+		const base64File = Buffer.from(fileBuffer).toString("base64");
 
-    await s3Client.send(uploadCommand);
+		await sendEmailWithAttachment({
+			to: email,
+			title,
+			url,
+			attachment: {
+				fileName: title,
+				contentType:
+					response.headers.get("content-type") || "application/octet-stream",
+				base64Content: base64File,
+			},
+		});
 
-    return {
-      success: true,
-      message: `File sent to ${email}`,
-      metadata: {
-        s3Key,
-        title,
-        originalUrl: url,
-        contentType: response.headers.get('content-type'),
-        contentLength: fileBuffer.byteLength,
-      }
-    }
+		const s3Key = fileName;
+		const uploadCommand = new PutObjectCommand({
+			Bucket: Resource.YTDLBucket.name,
+			Key: s3Key,
+			Body: Buffer.from(fileBuffer),
+			ContentType:
+				response.headers.get("content-type") || "application/octet-stream",
+			Metadata: {
+				title,
+				originalUrl: url,
+				sentTo: email,
+			},
+		});
 
-  } catch (error) {
-    console.error('Processing error:', error);
-    return { error: 'Failed to process request' }
-  }
-// throw new Error("not implemented");
+		await s3Client.send(uploadCommand);
+
+		return {
+			success: true,
+			message: `File sent to ${email}`,
+			metadata: {
+				s3Key,
+				title,
+				originalUrl: url,
+				contentType: response.headers.get("content-type"),
+				contentLength: fileBuffer.byteLength,
+			},
+		};
+	}
+
 }
 
-// const app = new Hono();
+interface EmailAttachment {
+	fileName: string;
+	contentType: string;
+	base64Content: string;
+}
 
+async function sendEmailWithAttachment({
+	to,
+	title,
+	url,
+	attachment,
+}: {
+	to: string;
+	title: string;
+	url: string;
+	attachment: EmailAttachment;
+}) {
+	const emailCommand = new SendEmailCommand({
+		FromEmailAddress: "guideg6@gmail.com",
+		Destination: {
+			ToAddresses: [to],
+		},
+		Content: {
+			Raw: {
+				Data: new Uint8Array(
+					Buffer.from(
+						[
+							"From: guideg6@gmail.com",
+							`To: ${to}`,
+							`Subject: Download ${title}`,
+							"MIME-Version: 1.0",
+							'Content-Type: multipart/mixed; boundary="boundary"',
+							"",
+							"--boundary",
+							"Content-Type: text/html; charset=utf-8",
+							"Content-Transfer-Encoding: 7bit",
+							"",
+							`<h2>Your file is attached</h2>
+                            <p>File: ${title}</p>`,
+							"",
+							"--boundary",
+							`Content-Type: ${attachment.contentType}`,
+							"Content-Transfer-Encoding: base64",
+							`Content-Disposition: attachment; filename="${attachment.fileName}.${attachment.contentType.split("/")[1]}"`,
+							"",
+							attachment.base64Content,
+							"",
+							"--boundary--",
+						].join("\r\n"),
+					),
+				),
+			},
+		},
+	});
 
-// app.post("/", async (c) => {
-// 	const { url, title, email } = await c.req.json<ProxyRequest>();
-// 	console.log('in worker', url, title, email)
-
-// 	if (!url || !title) {
-// 		return c.json({ error: "Missing required parameters" }, 400);
-// 	}
-
-	
-// });
-
-// Optional: Add endpoint to get the download URL for a specific key
-// app.get('/:key', async (c) => {
-//   const key = c.req.param('key');
-
-//   try {
-//     const command = new GetObjectCommand({
-//       Bucket: Resource.YTDLBucket.name,
-//       Key: key,
-//     });
-
-//     const presignedUrl = await getSignedUrl(s3Client, command, {
-//       expiresIn: 3600, // URL expires in 1 hour
-//     });
-
-//     return c.json({
-//       success: true,
-//       downloadUrl: presignedUrl,
-//     });
-//   } catch (error) {
-//     console.error('Download URL generation error:', error);
-//     return c.json({ error: 'Failed to generate download URL' }, 500);
-//   }
-// });
-
-// export const handler = handle(app);
+	return sesClient.send(emailCommand);
+}

@@ -23,7 +23,8 @@ async run() {
   });
   queue.subscribe({
     handler: "src/worker.handler",
-    link: [email, bucket]
+    link: [email, bucket],
+    timeout: "10 minutes"
   })
   
   new sst.aws.Function("Hono", {
