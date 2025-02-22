@@ -9,6 +9,9 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Resource } from "sst";
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
+import { convertToMp3 } from "./util";
+import { exec } from "node:child_process";
+import type { SQSEvent, SQSHandler, Context } from "aws-lambda";
 
 const s3Client = new S3Client({});
 const sesClient = new SESv2Client();
@@ -20,7 +23,12 @@ interface ProxyRequest {
 	email: string;
 }
 
-export async function handler(req) {
+export const handler: SQSHandler = async (
+	req: SQSEvent,
+	context: Context,
+): Promise<void> => {
+	console.log("req:", context);
+	// console.log(req.requestContext);
 	// console.log('req:', req)
 	const { url, title, email } = JSON.parse(req.Records[0].body);
 	const fileName = title.replace(/[^a-zA-Z0-9.-]/g, "_"); // Sanitize filename
@@ -43,7 +51,7 @@ export async function handler(req) {
 					title,
 					url,
 					attachment: {
-						fileName: title,
+						fileName: fileName,
 						contentType: existingFile.ContentType || "application/octet-stream",
 						base64Content: base64File,
 					},
@@ -63,20 +71,25 @@ export async function handler(req) {
 			}
 		}
 	} catch (error) {
-		if (error.Code !== "NoSuchKey") {
+		if (!(error instanceof Error)) throw new Error(String(error));
+
+		if (!("Code" in error) || error.Code !== "NoSuchKey") {
 			console.error("S3 check error:", error);
 			throw error;
 		}
-        console.log("fetchng")
-  
+		console.log("fetchng");
+
 		const response = await fetch(url);
+		console.log("response status:", response.status);
 		if (!response.ok) {
 			return {
 				error: `Failed to download file: ${response.status} ${response.statusText}`,
 			};
 		}
 
-		const fileBuffer = await response.arrayBuffer();
+		const arrayBuffer = await response.arrayBuffer();
+		const fileBuffer = Buffer.from(arrayBuffer);
+		console.log("fileBuffer.byteLength:", fileBuffer.byteLength);
 		if (fileBuffer.byteLength > MAX_FILE_SIZE) {
 			return {
 				error: "File size exceeds maximum allowed size of 40MB",
@@ -84,27 +97,28 @@ export async function handler(req) {
 		}
 
 		// Convert to Base64
-		const base64File = Buffer.from(fileBuffer).toString("base64");
+		// const base64File = Buffer.from(fileBuffer).toString("base64");
+		const mp3Buffer = convertToMp3(fileBuffer);
+		console.log("mp3Buffer length:", mp3Buffer.byteLength);
+		const base64File = mp3Buffer.toString("base64");
 
 		await sendEmailWithAttachment({
 			to: email,
 			title,
 			url,
 			attachment: {
-				fileName: title,
-				contentType:
-					response.headers.get("content-type") || "application/octet-stream",
+				fileName: `${fileName}.mp3`,
+				contentType: "audio/mpeg",
 				base64Content: base64File,
 			},
 		});
 
-		const s3Key = fileName;
+		const s3Key = `${fileName}.mp3`;
 		const uploadCommand = new PutObjectCommand({
 			Bucket: Resource.YTDLBucket.name,
 			Key: s3Key,
-			Body: Buffer.from(fileBuffer),
-			ContentType:
-				response.headers.get("content-type") || "application/octet-stream",
+			Body: mp3Buffer,
+			ContentType: "audio/mpeg",
 			Metadata: {
 				title,
 				originalUrl: url,
@@ -121,13 +135,12 @@ export async function handler(req) {
 				s3Key,
 				title,
 				originalUrl: url,
-				contentType: response.headers.get("content-type"),
-				contentLength: fileBuffer.byteLength,
+				contentType: "audio/mpeg",
+				contentLength: mp3Buffer.byteLength,
 			},
 		};
 	}
-
-}
+};
 
 interface EmailAttachment {
 	fileName: string;
@@ -172,7 +185,7 @@ async function sendEmailWithAttachment({
 							"--boundary",
 							`Content-Type: ${attachment.contentType}`,
 							"Content-Transfer-Encoding: base64",
-							`Content-Disposition: attachment; filename="${attachment.fileName}.${attachment.contentType.split("/")[1]}"`,
+							`Content-Disposition: attachment; filename="${attachment.fileName}"`,
 							"",
 							attachment.base64Content,
 							"",
@@ -185,4 +198,14 @@ async function sendEmailWithAttachment({
 	});
 
 	return sesClient.send(emailCommand);
+}
+
+export function checkFfmpeg(): Promise<boolean> {
+	const command = "which ffmpeg";
+
+	return new Promise((resolve) => {
+		exec(command, (error) => {
+			resolve(!error);
+		});
+	});
 }

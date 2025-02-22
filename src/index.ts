@@ -9,6 +9,7 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Resource } from "sst";
 import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
+import { checkFfmpeg } from "./worker";
 
 const app = new Hono();
 const s3Client = new S3Client({});
@@ -21,7 +22,10 @@ interface ProxyRequest {
 }
 
 app.post("/", async (c) => {
-	const { url, title, email } = await c.req.json<ProxyRequest>();
+
+
+
+  const { url, title, email } = await c.req.json<ProxyRequest>();
 	await client.send(
 		new SendMessageCommand({
 			QueueUrl: Resource.YTDLQ.url,
@@ -39,7 +43,7 @@ app.post("/", async (c) => {
 });
 
 // Optional: Add endpoint to get the download URL for a specific key
-app.get("/:key", async (c) => {
+app.get("/read/:key", async (c) => {
 	const key = c.req.param("key");
 
 	try {
@@ -61,5 +65,22 @@ app.get("/:key", async (c) => {
 		return c.json({ error: "Failed to generate download URL" }, 500);
 	}
 });
+
+app.get("/yo", async (c) => {
+
+
+  const isInstalled = await checkFfmpeg();
+    console.log('FFmpeg is installed:', isInstalled);
+
+	return c.json({
+	  status: "healthy",
+	  timestamp: new Date().toISOString(),
+	  services: {
+		s3: !!s3Client,
+		sqs: !!client
+	  },
+	  ffmpeg: isInstalled
+	}, 200);
+  });
 
 export const handler = handle(app);
