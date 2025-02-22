@@ -17,16 +17,17 @@ async run() {
   const email = new sst.aws.Email("MyEmail", {
     sender: "guideg6@gmail.com",
   });
-  
-  const queue = new sst.aws.Queue("YTDLQ", {
 
+  const queue = new sst.aws.Queue("YTDLQ", {
+    visibilityTimeout: '10 minutes'
   });
   queue.subscribe({
     handler: "src/worker.handler",
     link: [email, bucket],
-    timeout: "10 minutes"
+    timeout: "10 minutes",
+    nodejs: { install: ["ffmpeg-static"] }
   })
-  
+
   new sst.aws.Function("Hono", {
     url: {
       cors: {
@@ -36,7 +37,7 @@ async run() {
     },
     handler: "src/index.handler",
     timeout: "3 minutes",
-    link: [queue]
+    link: [queue, bucket]
   });
 }
 });
