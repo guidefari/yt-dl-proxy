@@ -7,6 +7,8 @@
   },
   "devDependencies": {
     "@types/aws-lambda": "8.10.147",
+    "@types/bun": "^1.2.3",
+    "@types/node": "^22.13.5",
     "esbuild": "^0.21.4",
     "npm-run-all2": "^6.2.0",
     "typescript": "^5.7.3"
