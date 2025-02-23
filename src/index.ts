@@ -1,19 +1,14 @@
 import { Hono } from "hono";
 import { handle } from "hono/aws-lambda";
-import { cors } from "hono/cors";
-import {
-	S3Client,
-	PutObjectCommand,
-	GetObjectCommand,
-} from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Resource } from "sst";
 import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
-import { checkFfmpeg } from "./worker";
+import ytdl from "@distube/ytdl-core";
+import { extractId } from "./util";
+import { s3Service } from "./bucket";
+// import { cookies } from "./cookies";
 
 const app = new Hono();
-const s3Client = new S3Client({});
-const client = new SQSClient();
+const _sqsClient = new SQSClient();
 
 interface ProxyRequest {
 	url: string;
@@ -22,11 +17,10 @@ interface ProxyRequest {
 }
 
 app.post("/", async (c) => {
+	const { url, title, email } = await c.req.json<ProxyRequest>();
 
 
-
-  const { url, title, email } = await c.req.json<ProxyRequest>();
-	await client.send(
+	await _sqsClient.send(
 		new SendMessageCommand({
 			QueueUrl: Resource.YTDLQ.url,
 			MessageBody: JSON.stringify({
@@ -47,14 +41,7 @@ app.get("/read/:key", async (c) => {
 	const key = c.req.param("key");
 
 	try {
-		const command = new GetObjectCommand({
-			Bucket: Resource.YTDLBucket.name,
-			Key: key,
-		});
-
-		const presignedUrl = await getSignedUrl(s3Client, command, {
-			expiresIn: 3600, // URL expires in 1 hour
-		});
+		const presignedUrl = await s3Service.getSignedDownloadUrl(key);
 
 		return c.json({
 			success: true,
@@ -66,21 +53,99 @@ app.get("/read/:key", async (c) => {
 	}
 });
 
-app.get("/yo", async (c) => {
+app.get("/health", async (c) => {
+	return c.status(200);
+});
 
+app.post("/trigger", async (c) => {
+	const { url, action } = await c.req.json();
 
-  const isInstalled = await checkFfmpeg();
-    console.log('FFmpeg is installed:', isInstalled);
+	if (!url) {
+		return c.json({ error: "URL is required" }, 400);
+	}
 
-	return c.json({
-	  status: "healthy",
-	  timestamp: new Date().toISOString(),
-	  services: {
-		s3: !!s3Client,
-		sqs: !!client
-	  },
-	  ffmpeg: isInstalled
-	}, 200);
-  });
+	const videoId = extractId(url);
+
+	if (!videoId) {
+		return c.json({ error: "Invalid YouTube URL" }, 400);
+	}
+
+	try {
+		// const agentOptions = {
+		// 	pipelining: 5,
+		// 	maxRedirections: 0,
+		// 	// localAddress: "127.0.0.1",
+		//   };
+		  
+		  // agent should be created once if you don't want to change your cookie
+		//   const agent = ytdl.createAgent(cookies, agentOptions);
+		// const info = await ytdl.getInfo(url, {agent});
+		
+		const info = await ytdl.getInfo(url);
+		const audioFormats = ytdl.filterFormats(info.formats, "audioonly");
+
+		const uniqueFormats = new Map(
+			audioFormats
+				.filter((format) => format.container === "mp4")
+				.map((format) => [`${format.container}-${format.codecs}`, format]),
+		);
+		const { url: dlUrl } = Array.from(uniqueFormats.values()).reduce(
+			(prev, current) =>
+				(prev.audioBitrate || 0) > (current.audioBitrate || 0) ? prev : current,
+		);
+
+		if (action === "download") {
+			const response = await app.request("/", {
+				method: "POST",
+				body: JSON.stringify({
+					title: info.videoDetails.title,
+					url: dlUrl,
+					email: "guideg6@gmail.com",
+				}),
+			});
+
+			if (!response.ok) {
+				throw new Error(`HTTP error! status: ${response.status}`);
+			}
+
+			return c.json({
+				message: "Download started successfully",
+				title: info.videoDetails.title,
+				embed: info.videoDetails.embed,
+			});
+		}
+
+		return c.json({
+			title: info.videoDetails.title,
+			embed: info.videoDetails.embed,
+			formats: Array.from(uniqueFormats.values()).map(
+				({
+					audioBitrate,
+					url,
+					contentLength,
+					approxDurationMs,
+					codecs,
+					container,
+				}) => ({
+					audioBitrate,
+					codecs,
+					mimeType: container,
+					url,
+					contentLength,
+					approxDurationMs,
+				}),
+			),
+		});
+	} catch (err) {
+		console.error("Error processing request:", err);
+		return c.json(
+			{
+				error: "Failed to retrieve video information",
+				details: err instanceof Error ? err.message : "Unknown error",
+			},
+			500,
+		);
+	}
+});
 
 export const handler = handle(app);
