@@ -24,7 +24,7 @@ async run() {
   queue.subscribe({
     handler: "src/worker.handler",
     link: [email, bucket],
-    timeout: "10 minutes",
+    timeout: "15 minutes",
     nodejs: { install: ["ffmpeg-static"] }
   })
 
