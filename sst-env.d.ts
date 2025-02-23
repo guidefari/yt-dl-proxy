@@ -15,6 +15,10 @@ declare module "sst" {
       "sender": string
       "type": "sst.aws.Email"
     }
+    "MyWeb": {
+      "type": "sst.aws.Astro"
+      "url": string
+    }
     "YTDLBucket": {
       "name": string
       "type": "sst.aws.Bucket"

@@ -6,13 +6,10 @@
     "strict": true,
     "skipLibCheck": true,
     "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    },
     "jsx": "react-jsx",
     "jsxImportSource": "hono/jsx",
   },
-  "include": ["src/**/*", "sst-env.d.ts"],
+  "include": ["backend/**/*", "sst-env.d.ts"],
   "exclude": [
     ".sst",
     ".sst/**/*",

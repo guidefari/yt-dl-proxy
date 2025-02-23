@@ -22,22 +22,29 @@ async run() {
     visibilityTimeout: '10 minutes'
   });
   queue.subscribe({
-    handler: "src/worker.handler",
+    handler: "backend/worker.handler",
     link: [email, bucket],
     timeout: "15 minutes",
     nodejs: { install: ["ffmpeg-static"] }
   })
 
-  new sst.aws.Function("Hono", {
+  const api = new sst.aws.Function("Hono", {
     url: {
       cors: {
         allowMethods: ["GET", "POST"],
         allowOrigins: ["http://localhost:3001"]
       }
     },
-    handler: "src/index.handler",
+    handler: "backend/index.handler",
     timeout: "3 minutes",
     link: [queue, bucket]
+  });
+
+  new sst.aws.Astro("MyWeb", {
+    path: "frontend/",
+    environment: {
+      API_URL: api.url,
+    }
   });
 }
 });
