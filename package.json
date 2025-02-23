@@ -1,19 +1,22 @@
 {
-  "name": "aws-hono",
+  "name": "@guidefari/dl-prox",
   "type": "module",
   "scripts": {
-    "dev": "sst dev"
+    "dev": "sst dev",
+    "ts": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/aws-lambda": "8.10.147",
     "esbuild": "^0.21.4",
-    "npm-run-all2": "^6.2.0"
+    "npm-run-all2": "^6.2.0",
+    "typescript": "^5.7.3"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.744.0",
     "@aws-sdk/client-sesv2": "^3.744.0",
     "@aws-sdk/client-sqs": "^3.744.0",
     "@aws-sdk/s3-request-presigner": "^3.744.0",
+    "@distube/ytdl-core": "4.16.4",
     "ffmpeg-static": "^5.2.0",
     "hono": "^4.6.20",
     "sst": "3.8.2"
