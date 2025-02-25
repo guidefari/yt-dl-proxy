@@ -32,10 +32,10 @@ async run() {
     url: {
       cors: {
         allowMethods: ["GET", "POST"],
-        allowOrigins: ["http://localhost:3001"]
+        allowOrigins: ["http://localhost:3001", "http://localhost:4321"]
       }
     },
-    handler: "backend/index.handler",
+    handler: "backend/api.handler",
     timeout: "3 minutes",
     link: [queue, bucket]
   });
@@ -43,7 +43,7 @@ async run() {
   new sst.aws.Astro("MyWeb", {
     path: "frontend/",
     environment: {
-      API_URL: api.url,
+      PUBLIC_API_URL: api.url,
     }
   });
 }

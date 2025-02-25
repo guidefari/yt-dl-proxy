@@ -82,6 +82,7 @@ app.post("/trigger", async (c) => {
 		// const info = await ytdl.getInfo(url, {agent});
 		
 		const info = await ytdl.getInfo(url);
+		console.log('info:', info)
 		const audioFormats = ytdl.filterFormats(info.formats, "audioonly");
 
 		const uniqueFormats = new Map(
