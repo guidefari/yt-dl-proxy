@@ -10,12 +10,14 @@ export default $config({
     };
   },
 async run() {
+  const isProd = $app.stage === 'production'
+  
   const bucket = new sst.aws.Bucket("YTDLBucket", {
     access: "public"
   });
 
   const email = new sst.aws.Email("MyEmail", {
-    sender: "guideg6@gmail.com",
+    sender: isProd ? "guideg6+ytdl@gmail.com" : "guideg6@gmail.com",
   });
 
   const queue = new sst.aws.Queue("YTDLQ", {
