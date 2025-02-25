@@ -13,7 +13,7 @@ async run() {
   const isProd = $app.stage === 'production'
   
   const bucket = new sst.aws.Bucket("YTDLBucket", {
-    access: "public"
+    // access: "public"
   });
 
   const email = new sst.aws.Email("MyEmail", {
