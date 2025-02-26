@@ -21,7 +21,7 @@ async run() {
   });
 
   const queue = new sst.aws.Queue("YTDLQ", {
-    visibilityTimeout: '10 minutes'
+    visibilityTimeout: '15 minutes'
   });
   queue.subscribe({
     handler: "backend/worker.handler",
