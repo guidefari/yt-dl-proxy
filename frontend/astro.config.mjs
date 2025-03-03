@@ -13,4 +13,5 @@ export default defineConfig({
 
   adapter: aws(),
   integrations: [react()],
+  output: 'server',
 });
