@@ -46,7 +46,8 @@ async run() {
     path: "frontend/",
     environment: {
       PUBLIC_API_URL: api.url,
-    }
+    },
+    buildCommand: "bun run build",
   });
 }
 });

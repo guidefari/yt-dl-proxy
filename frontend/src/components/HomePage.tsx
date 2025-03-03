@@ -4,8 +4,8 @@ import type { AudioFormat, VideoInfo } from "@/types";
 import { toast, Toaster } from "sonner";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
-import {PUBLIC_API_URL} from "astro:env/client"
 
+const PUBLIC_API_URL = import.meta.env.PUBLIC_API_URL
 
 export default function Home() {
 	const [url, setUrl] = useState("");
@@ -54,15 +54,15 @@ export default function Home() {
 	};
 	return (
 		<>
-			<div className="w-full max-w-xl mx-auto p-6 flex flex-col justify-between min-h-screen">
+			<div className="flex flex-col justify-between w-full max-w-xl min-h-screen p-6 mx-auto">
 				<div>
-					<h2 className="text-4xl sm:text-5xl font-extrabold mb-4 bg-clip-text ">
+					<h2 className="mb-4 text-4xl font-extrabold sm:text-5xl bg-clip-text ">
 						YouTube to MP3{" "}
 					</h2>
-					<p className="text-lg sm:text-xl mb-8 ">(for research purposes👀)</p>
+					<p className="mb-8 text-lg sm:text-xl ">(for research purposes👀)</p>
 				</div>
 
-				<div className="flex-1 items-center justify-center">
+				<div className="items-center justify-center flex-1">
 					<form onSubmit={handleSubmit} className="space-y-4 w full">
 						<div className="flex space-x-2">
 							<Input
@@ -71,7 +71,7 @@ export default function Home() {
 								value={url}
 								onChange={(e) => setUrl(e.target.value)}
 								required
-								className="placeholder:text-black rounded-none"
+								className="rounded-none placeholder:text-black"
 							/>
 							<Button
 								type="submit"
@@ -80,7 +80,7 @@ export default function Home() {
 							>
 								{status === "loading" ? (
 									<>
-										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+										<Loader2 className="w-4 h-4 mr-2 animate-spin" />
 										Processing
 									</>
 								) : (

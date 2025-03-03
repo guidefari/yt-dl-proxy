@@ -1,5 +1,5 @@
 // @ts-check
-import { defineConfig, envField } from 'astro/config';
+import { defineConfig  } from 'astro/config';
 import aws from 'astro-sst'
 
 import tailwindcss from '@tailwindcss/vite';
@@ -13,9 +13,4 @@ export default defineConfig({
 
   adapter: aws(),
   integrations: [react()],
-  env: {
-    schema: {
-      PUBLIC_API_URL: envField.string({ context: "client", access: "public", optional: false })
-    }
-  }
 });
