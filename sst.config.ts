@@ -34,7 +34,7 @@ async run() {
     url: {
       cors: {
         allowMethods: ["GET", "POST"],
-        allowOrigins: ["http://localhost:3001", "http://localhost:4321"]
+        allowOrigins: ["http://localhost:3001", "http://localhost:4321", "https://d2zzy9usn07re1.cloudfront.net/"]
       }
     },
     handler: "backend/api.handler",
