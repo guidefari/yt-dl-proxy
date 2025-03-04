@@ -60,6 +60,10 @@ app.get("/health", async (c) => {
 app.post("/trigger", async (c) => {
 	const { url, action } = await c.req.json();
 
+	if (action !== "download") {
+		return c.json({ error: "Invalid action - only supporting download at the moment" }, 400);
+	}
+
 	if (!url) {
 		return c.json({ error: "URL is required" }, 400);
 	}
@@ -96,48 +100,25 @@ app.post("/trigger", async (c) => {
 				(prev.audioBitrate || 0) > (current.audioBitrate || 0) ? prev : current,
 		);
 
-		if (action === "download") {
-			const response = await app.request("/", {
-				method: "POST",
-				body: JSON.stringify({
-					title: info.videoDetails.title,
-					url: dlUrl,
-					email: "guideg6@gmail.com",
-				}),
-			});
-
-			if (!response.ok) {
-				throw new Error(`HTTP error! status: ${response.status}`);
-			}
-
-			return c.json({
-				message: "Download started successfully",
+		const response = await app.request("/", {
+			method: "POST",
+			body: JSON.stringify({
 				title: info.videoDetails.title,
-				embed: info.videoDetails.embed,
-			});
+				url: dlUrl,
+				email: "guideg6@gmail.com",
+			}),
+		});
+
+		if (!response.ok) {
+			throw new Error(`HTTP error! status: ${response.status}`);
 		}
 
 		return c.json({
+			message: "Download started successfully",
 			title: info.videoDetails.title,
 			embed: info.videoDetails.embed,
-			formats: Array.from(uniqueFormats.values()).map(
-				({
-					audioBitrate,
-					url,
-					contentLength,
-					approxDurationMs,
-					codecs,
-					container,
-				}) => ({
-					audioBitrate,
-					codecs,
-					mimeType: container,
-					url,
-					contentLength,
-					approxDurationMs,
-				}),
-			),
 		});
+
 	} catch (err) {
 		console.error("Error processing request:", err);
 		return c.json(
