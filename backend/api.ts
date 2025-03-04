@@ -66,6 +66,8 @@ app.post("/trigger", async (c) => {
 
 	const videoId = extractId(url);
 
+	const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip')
+
 	if (!videoId) {
 		return c.json({ error: "Invalid YouTube URL" }, 400);
 	}
@@ -74,7 +76,7 @@ app.post("/trigger", async (c) => {
 		const agentOptions = {
 			pipelining: 5,
 			maxRedirections: 0,
-			// localAddress: "127.0.0.1",
+			localAddress: ip,
 		};
 		const cookies = await s3Service.getFile("cookies.json")
 		const cookieString = await cookies.Body?.transformToString()
