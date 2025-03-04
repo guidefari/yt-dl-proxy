@@ -5,7 +5,6 @@ import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
 import ytdl from "@distube/ytdl-core";
 import { extractId } from "./util";
 import { s3Service } from "./bucket";
-// import { cookies } from "./cookies";
 
 const app = new Hono();
 const _sqsClient = new SQSClient();
@@ -15,6 +14,7 @@ interface ProxyRequest {
 	title: string;
 	email: string;
 }
+
 
 app.post("/", async (c) => {
 	const { url, title, email } = await c.req.json<ProxyRequest>();
@@ -71,18 +71,16 @@ app.post("/trigger", async (c) => {
 	}
 
 	try {
-		// const agentOptions = {
-		// 	pipelining: 5,
-		// 	maxRedirections: 0,
-		// 	// localAddress: "127.0.0.1",
-		//   };
-		  
-		  // agent should be created once if you don't want to change your cookie
-		//   const agent = ytdl.createAgent(cookies, agentOptions);
-		// const info = await ytdl.getInfo(url, {agent});
-		
-		const info = await ytdl.getInfo(url);
-		console.log('info:', info)
+		const agentOptions = {
+			pipelining: 5,
+			maxRedirections: 0,
+			// localAddress: "127.0.0.1",
+		};
+		const cookies = await s3Service.getFile("cookies.json")
+		const cookieString = await cookies.Body?.transformToString()
+		const cookiesData = cookieString ? JSON.parse(cookieString) : null;
+		const agent = ytdl.createAgent(cookiesData, agentOptions);
+		const info = await ytdl.getInfo(url, {agent});
 		const audioFormats = ytdl.filterFormats(info.formats, "audioonly");
 
 		const uniqueFormats = new Map(
