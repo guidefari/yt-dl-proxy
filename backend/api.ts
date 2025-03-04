@@ -73,16 +73,17 @@ app.post("/trigger", async (c) => {
 	}
 
 	try {
+		const cookies = await s3Service.getFile("cookies.json");
+		const cookieString = await cookies.Body?.transformToString();
+		const cookiesData = cookieString ? JSON.parse(cookieString) : null;
+
 		const agentOptions = {
 			pipelining: 5,
 			maxRedirections: 0,
-			localAddress: "127.0.0.1",
 		};
-		const cookies = await s3Service.getFile("cookies.json")
-		const cookieString = await cookies.Body?.transformToString()
-		const cookiesData = cookieString ? JSON.parse(cookieString) : null;
+
 		const agent = ytdl.createAgent(cookiesData, agentOptions);
-		const info = await ytdl.getInfo(url, {agent});
+		const info = await ytdl.getInfo(url, { agent });
 		const audioFormats = ytdl.filterFormats(info.formats, "audioonly");
 
 		const uniqueFormats = new Map(
