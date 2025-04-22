@@ -1,0 +1,15 @@
+meta {
+  name: get cookies
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{lambda}}/cookies
+  body: json
+  auth: none
+}
+
+body:json {
+  {"hi": "world"}
+}

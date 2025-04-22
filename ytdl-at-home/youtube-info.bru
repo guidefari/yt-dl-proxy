@@ -1,0 +1,27 @@
+meta {
+  name: youtube-info
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{api_url}}/youtube-info
+  body: json
+  auth: none
+}
+
+headers {
+  Accept: */*
+  Accept-Language: en-US,en;q=0.9
+  Connection: keep-alive
+  Content-Type: application/json
+  Sec-Fetch-Dest: empty
+  Sec-Fetch-Mode: cors
+  Sec-Fetch-Site: same-origin
+}
+
+body:json {
+  {
+    "url": "https://youtu.be/K-2pXMP3uu4?si=TIN4XxcbS0bMea-3"
+  }
+}

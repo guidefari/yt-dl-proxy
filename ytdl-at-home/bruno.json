@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "ytdl-at-home",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}
