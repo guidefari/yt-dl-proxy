@@ -5,7 +5,6 @@ export default $config({
     return {
       name: "yt-dl-proxy",
       removal: input?.stage === "production" ? "retain" : "remove",
-      protect: ["production"].includes(input?.stage),
       home: "aws",
     };
   },
